@@ -20,45 +20,45 @@ class ChatClient(asyncio.Protocol):
 
     def data_received(self, data):
         self.data += data
-        print(self.data[0:4])
-        print(self.data[5:])
-        if len(self.data[5:]) == struct.unpack('!I', self.data[0:4]):
+        if len(self.data[4:]) == struct.unpack('!I', self.data[0:4])[0]:
             print("Full Data recived")
-            self.data = json.loads(self.data[5:])
-            if "USERNAME_ACCEPTED" in self.data:
-                if self.data['USERNAME_ACCEPTED'] == 'true':
+            recv_data = json.loads(self.data[4:].decode('ascii'))
+            print(recv_data)
+            if 'USERNAME_ACCEPTED' in recv_data:
+                if recv_data['USERNAME_ACCEPTED']:
 
-                    if "INFO" in self.data:
-                        print('-----' + self.data['INFO'] + '-----')
+                    if "INFO" in recv_data:
+                        print('-----' + recv_data['INFO'] + '-----')
 
                     print("Current Users")
                     print("-----------------------")
-                    if "USER_LIST" in self.data:
-                        for i in self.data["USER_LIST"]:
-                            print(">>>" + i + '  Status: Online')
+                    if "USER_LIST" in recv_data:
+                        for i in recv_data["USER_LIST"]:
+                            print(">>> " + i + '  Status: Online')
                     else:
                         print('No Users Online')
                     print("-----------------------")
                     print('  ')
 
                     print('Messages')
-                    if 'MESSAGES' in self.data:
-                        for i in self.data['MESSAGES']:
-                            if i[2] == self.username:
+                    if 'MESSAGES' in recv_data:
+                        print('Entered messaage if')
+                        for i in recv_data['MESSAGES']:
+                            if i[1] == self.username:
                                 print('----- Private Message -----')
-                                print('>>>>' + i[0] + ': ' + i[4] + '   (Sent at ' + i[3] + ')')
+                                print('>>>>' + i[0] + ': ' + i[3] + '   (Sent at ' + str(i[2]) + ')')
                                 print('----------------------------')
-                            if i[2] == 'ALL':
-                                print(i[0] + ': ' + i[4] + '   (Sent at ' + i[3] + ')')
+                            if i[1] == 'ALL':
+                                print(i[0] + ': ' + i[3] + '   (Sent at ' + str(i[2]) + ')')
                     else:
                         print('No recent Messages')
 
-                    if 'USERS_JOINED' in self.data:
-                        for i in self.data['USERS_JOINED']:
+                    if 'USERS_JOINED' in recv_data:
+                        for i in recv_data['USERS_JOINED']:
                             print(i + ' has joined the chatroom')
 
-                    if 'USERS_LEFT' in self.data:
-                        for i in self.data["USERS_LEFT"]:
+                    if 'USERS_LEFT' in recv_data:
+                        for i in recv_data["USERS_LEFT"]:
                             print(i + ' has left the chatroom')
 
                     self.login_status = True
