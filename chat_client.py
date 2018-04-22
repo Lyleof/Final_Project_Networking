@@ -21,60 +21,143 @@ class ChatClient(asyncio.Protocol):
     def data_received(self, data):
         self.data += data
         if len(self.data[4:]) == struct.unpack('!I', self.data[0:4])[0]:
-            print("Full Data recived")
             recv_data = json.loads(self.data[4:].decode('ascii'))
-            print(recv_data)
+
             if 'USERNAME_ACCEPTED' in recv_data:
-                if recv_data['USERNAME_ACCEPTED']:
+                if recv_data['USERNAME_ACCEPTED'] and self.username == '':
+                    if ['USERNAME'] in recv_data:
+                        self.username = recv_data['USERNAME']
 
-                    if "INFO" in recv_data:
-                        print('-----' + recv_data['INFO'] + '-----')
+                    print('  ')
+                    print("Your Username is: {}".format(self.username))
+                    print('  ')
+                    self.login_status = True
 
-                    print("Current Users")
+                if not recv_data['USERNAME_ACCEPTED']:
+                    print('Invalid Username or No Previously Held Username')
+
+            if "INFO" in recv_data:
+                print('-----{}-----'.format(recv_data['INFO']))
+                print('  ')
+
+            if "USER_LIST" in recv_data:
+                print('  ')
+                print("-----Current Users-----")
+                print("-----------------------")
+                for i in recv_data["USER_LIST"]:
+                    print('>>> {}  Status: Online'.format(i))
+                print("-----------------------")
+                print('  ')
+
+            if 'USERS_JOINED' in recv_data:
+                print('  ')
+                print("-----------------------")
+                for i in recv_data['USERS_JOINED']:
+                    print('{} has joined the chatroom'.format(i))
+                print("-----------------------")
+                print('  ')
+
+            if 'USERS_LEFT' in recv_data:
+                print('  ')
+                print("-----------------------")
+                for i in recv_data["USERS_LEFT"]:
+                    print('{} has left the chatroom'.format(i))
+                print("-----------------------")
+                print('  ')
+
+            if 'ERROR' in recv_data:
+                print('  ')
+                print("-----------------------")
+                print('>>> Error message received: {}'.format(recv_data['ERROR']))
+                print("-----------------------")
+                print('  ')
+
+            if 'MESSAGES' in recv_data:
+                print('--------Messages--------')
+                print('------------------------')
+                for i in recv_data['MESSAGES']:
+                    if i[1] == self.username:
+                        print('----- Private Message -----')
+                        print('>>>> {}:    (Sent at {})'.format(i[0], i[3], i[2]))
+                        print('----------------------------')
+                    if i[1] == 'ALL':
+                        print('{}: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+
+            if 'FILE_LIST' in recv_data:
+                print('  ')
+                print('-------File List-------')
+                print("-----------------------")
+                for i in recv_data['FILE_LIST']:
+                    print('>>> {}'.format(i))
+                print("-----------------------")
+                print('  ')
+
+            if 'FILE_DOWNLOAD' in recv_data:
+                if recv_data['FILE_DOWNLOAD'][2] == 'ERROR' and self.username == recv_data['FILE_DOWNLOAD'][0]:
+                    print('  ')
                     print("-----------------------")
-                    if "USER_LIST" in recv_data:
-                        for i in recv_data["USER_LIST"]:
-                            print(">>> " + i + '  Status: Online')
-                    else:
-                        print('No Users Online')
+                    print(recv_data['FILE_DOWNLOAD'][1])
+                    print("-----------------------")
+                    print('  ')
+                if self.username == recv_data['FILE_DOWNLOAD'][0]:
+                    print('  ')
+                    print("-----------------------")
+                    try:
+                        open_file = open(recv_data['FILE_DOWNLOAD'][2], 'w+')
+                        open_file.write(recv_data['FILE_DOWNLOAD'][1])
+                        open_file.close()
+                        print('>>> {} Downloaded Successfully'.format(recv_data['FILE_DOWNLOAD'][2]))
+                    except exec as e:
+                        print('>>> Error: {} while Downloading File {}'.format(e, recv_data['FILE_DOWNLOAD'][2]))
                     print("-----------------------")
                     print('  ')
 
-                    print('Messages')
-                    if 'MESSAGES' in recv_data:
-                        print('Entered messaage if')
-                        for i in recv_data['MESSAGES']:
-                            if i[1] == self.username:
-                                print('----- Private Message -----')
-                                print('>>>>' + i[0] + ': ' + i[3] + '   (Sent at ' + str(i[2]) + ')')
-                                print('----------------------------')
-                            if i[1] == 'ALL':
-                                print(i[0] + ': ' + i[3] + '   (Sent at ' + str(i[2]) + ')')
-                    else:
-                        print('No recent Messages')
+            if 'FILE_UPLOAD' in recv_data:
+                if recv_data['FILE_UPLOAD'][2] == 'ERROR' and recv_data['FILE_UPLOAD'][0] == self.username:
+                    print('  ')
+                    print("-----------------------")
+                    print('File {} already exists on the Server'.format(recv_data['FILE_UPLOAD'][1]))
+                    print("-----------------------")
+                    print('  ')
+                if recv_data['FILE_UPLOAD'][0] == self.username:
+                    print('  ')
+                    print("-----------------------")
+                    print('>>> {} Uploaded Successfully'.format(recv_data['FILE_UPLOAD'][1]))
+                    print("-----------------------")
+                    print('  ')
 
-                    if 'USERS_JOINED' in recv_data:
-                        for i in recv_data['USERS_JOINED']:
-                            print(i + ' has joined the chatroom')
+            if 'IP' in recv_data:
+                if recv_data['IP'][0] == self.username:
+                    print('  ')
+                    print("-----------------------")
+                    print('>>> {}'.format(recv_data['IP'][1]))
+                    print("-----------------------")
+                    print('  ')
 
-                    if 'USERS_LEFT' in recv_data:
-                        for i in recv_data["USERS_LEFT"]:
-                            print(i + ' has left the chatroom')
-
-                    self.login_status = True
-
-                else:
-                    print('Sorry that username is not available at this moment please enter a new one')
+        self.data = b''
 
 
 @asyncio.coroutine
 def handle_user_input(loop, client):
     login_data = {'USERNAME': ''}
-    default_messgae = {'MESSAGES': ''}
-    # ip = socket.gethostbyname(socket.gethostname())
+    default_message = {'MESSAGES': []}
+    file_upload = {'FILE_UPLOAD': ()}
+    file_download = {'FILE_DOWNLOAD': ''}
+    ip_address = {'IP': ()}
+    ip = socket.gethostbyname(socket.gethostname())
 
-    if not client.login_status:
-        while True:
+    while not client.login_status:
+        choice = input('Create New User[Y] or Check for Existing Username[N]:  ')
+
+        if choice == 'N':
+            ip_address['IP'] = ('', ip)
+            data_json = json.dumps(ip_address)
+            byte_json = data_json.encode('ascii')
+            byte_count = struct.pack("!I", len(byte_json))
+            client.send_message(byte_count)
+            client.send_message(byte_json)
+
+        if choice == 'Y':
             message = yield from loop.run_in_executor(None, input, "> Enter your username: ")
             if message == "quit" or message == 'exit':
                 loop.stop()
@@ -89,26 +172,78 @@ def handle_user_input(loop, client):
             client.send_message(byte_json)
             client.username = message
 
-    if client.login_status:
-        while True:
-            message = yield from loop.run_in_executor(None, input, "> ")
-            if message == "quit" or message == 'exit':
-                # Send disconnect message here
-                loop.stop()
-                return
-            # Add whisper function here and extra command handling
+        login_data['USERNAME'] = ''
+        ip_address['IP'] = ()
 
+    while client.login_status:
+        message = yield from loop.run_in_executor(None, input, "> ")
+        if message == "quit" or message == 'exit':
+            loop.stop()
+            return
+
+        if message[0] == '/':
+            if message.split(' ', maxsplit=1)[0][1:] == 'help':
+                list_commands()
+
+            if message.split(' ', maxsplit=1)[0][1:] == 'w':
+                username = message.split(' ', maxsplit=2)[1]
+                private_message = message.split(' ', maxsplit=2)[2]
+                complete_message = (client.username, username, calendar.timegm(time.gmtime()),
+                                    private_message)
+                default_message['MESSAGES'].append(complete_message)
+                data_json = json.dumps(default_message)
+                byte_json = data_json.encode('ascii')
+                byte_count = struct.pack('!I', len(byte_json))
+
+                client.send_message(byte_count)
+                client.send_message(byte_json)
+
+            if message.split(' ', maxsplit=1)[0][1:] == 'file':
+                filename = message.split(' ', maxsplit=1)[1]
+                try:
+                    open_file = open(filename, 'r')
+                    data = open_file.read()
+                    file_upload['FILE_UPLOAD'] = (filename, data)
+                    data_json = json.dumps(file_upload)
+                    byte_json = data_json.encode('ascii')
+                    byte_count = struct.pack('!I', len(byte_json))
+                    client.send_message(byte_count)
+                    client.send_message(byte_json)
+                except exec as e:
+                    print('-----------------------')
+                    print('File Upload Error: {}'.format(e))
+                    print('-----------------------')
+
+            if message.split(' ', maxsplit=1)[0][1:] == 'file_download':
+                filename = message.split(' ', maxsplit=1)[1]
+                file_download['FILE_DOWNLOAD'] = filename
+                data_json = json.dumps(file_download)
+                byte_json = data_json.encode('ascii')
+                byte_count = struct.pack('!I', len(byte_json))
+                client.send_message(byte_count)
+                client.send_message(byte_json)
+
+            if message.split(' ', maxsplit=1)[0][1:] == 'save':
+                ip_address['IP'] = (message, ip)
+                data_json = json.dumps(ip_address)
+                byte_json = data_json.encode('ascii')
+                byte_count = struct.pack('!I', len(byte_json))
+                client.send_message(byte_count)
+                client.send_message(byte_json)
+
+        else:
             complete_message = (client.username, 'ALL', calendar.timegm(time.gmtime()), message)
-            default_messgae['MESSAGES'] = complete_message
-            data_json = json.dumps(default_messgae)
+            default_message['MESSAGES'].append(complete_message)
+            data_json = json.dumps(default_message)
             byte_json = data_json.encode('ascii')
             byte_count = struct.pack('!I', len(byte_json))
-
             client.send_message(byte_count)
             client.send_message(byte_json)
 
-            default_messgae['MESSAGES'] = ''
-
+        default_message['MESSAGES'] = []
+        file_upload['FILE_UPLOAD'] = ()
+        file_download['FILE_DOWNLOAD'] = ''
+        ip_address["IP"] = ()
 
 
 def run_client(host, port):
@@ -122,6 +257,22 @@ def run_client(host, port):
         loop.run_forever()
     finally:
         loop.close()
+
+
+def list_commands():
+    print('  ')
+    print('Chat Client Commands')
+    print('-----------------------')
+    print("Whisper: Send a online user a private message: /w username (message)")
+    print('Current Users: Get a list of all current online users: /users')
+    print('File Transfer (Upload): Transfer a file to the server: /file (file path)')
+    print('File Transfer (Download): Prints out the contents of a file: /file_download (file name)')
+    print('File List: Lists all files currently stored on a server: /file_list')
+    print('Save Username: Save your current username to the server to auto login at this ip address: /save')
+    print('Exit: Close the client: quit or exit')
+    print('Commands: Lists all commands for the Client: /help')
+    print('-----------------------')
+    print('  ')
 
 
 def parse_command_line(description):

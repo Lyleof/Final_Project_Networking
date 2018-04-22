@@ -3,18 +3,17 @@ import argparse
 import json
 import struct
 
+
 class ChatServer(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.address = transport.get_extra_info('peername')
+        self.user = ''
         self.data = b''
-        print('Accepted connection from {}'.format(self.address))
-        self.user_list = {}
-        self.user_list["USER_LIST"] = []
-        self.messages = {}
-        self.validate_user = {}
-        self.validate_user["USERNAME_ACCEPTED"] = "False"
+        self.user_list = {"USER_LIST": []}
+        self.saved_users = {}
+        self.messages = {'MESSAGES': []}
+        self.file_list = {'FILE_LIST': []}
 
     def send_message(self, data):
         byte_count = struct.pack('!I', len(data))
@@ -23,45 +22,95 @@ class ChatServer(asyncio.Protocol):
 
     def data_received(self, data):
         self.data += data
-        print(self.data[0:4])
-        print(self.data[5:])
-
         if len(self.data[4:]) == struct.unpack('!I', self.data[0:4])[0]:
-            print("all data got")
             recv_data = json.loads(self.data[4:].decode('ascii'))
-            print(recv_data)
+            full_data = {}
 
-            self.username_check(recv_data['USERNAME'])
+            if 'USERNAME' in recv_data:
+                result = self.username_check(recv_data['USERNAME'])
+                full_data['USERNAME_ACCEPTED'] = result
+                if result:
+                    self.user_list['USER_LIST'].append(recv_data['USERNAME'])
+                    full_data['USER_JOINED'].append(recv_data['USERNAME'])
+                    full_data['INFO'] = 'Welcome the CYOSP Chatroom'
+                    full_data['USER_LIST'] = self.user_list['USER_LIST']
+                    full_data['MESSAGES'] = self.messages['MESSAGES']
+                    self.user = recv_data['USERNAME']
 
-            # TODO: Create a single json object to send everything
-            data_json = json.dumps(self.validate_user)
-            # data_json += json.dumps(self.user_list)
+            if 'IP' in recv_data:
+                if not recv_data['IP'][0]:
+                    for k, v in self.saved_users.items():
+                        if k == recv_data['IP'][1]:
+                            full_data['USERNAME_ACCEPTED'] = True
+                            full_data['USERNAME'] = v
+                else:
+                    for k, v in self.saved_users.items():
+                        if k == recv_data['IP'][1]:
+                            full_data['IP'] = (self.user, 'A Username is already save to this ip address')
+                    if not full_data['IP']:
+                        self.saved_users[recv_data['IP'][1]] = self.user
+                        full_data['IP'] = (self.user, 'Username save to Server')
+
+            if 'MESSAGES' in recv_data:
+                if recv_data['MESSAGES'] == '/users':
+                    full_data['USER_LIST'] = self.user_list['USER_LIST']
+                if recv_data['MESSAGES'] == '/file_list':
+                    full_data['FILE_LIST'] = self.file_list['FILE_LIST']
+                else:
+                    self.messages['MESSAGES'].append(recv_data['MESSAGES'])
+                    full_data['MESSAGES'] = self.messages['MESSAGES']
+
+            if 'FILE_DOWNLOAD' in recv_data:
+                if recv_data['FILE_DOWNLOAD'][0] in self.file_list['FILE_LIST']:
+                    try:
+                        open_file = open(recv_data['FILE_DOWNLOAD'][0], 'r')
+                        data = open_file.read()
+                        full_data['FILE_DOWNLOAD'] = (self.user, data, recv_data['FILE_DOWNLOAD'][0])
+                    except exec as e:
+                        full_data['ERROR'] += e
+                else:
+                    full_data['FILE_DOWNLOAD'] = (self.user, 'File not on Server', 'ERROR')
+
+            if 'FILE_UPLOAD' in recv_data:
+                if recv_data['FILE_UPLOAD'][0] in self.file_list['FILE_LIST']:
+                    full_data['FILE_UPLOAD'] = (self.user, recv_data['FILE_UPLOAD'][0],
+                                                'ERROR')
+                else:
+                    try:
+                        open_file = open(recv_data['FILE_UPLOAD'][0], 'w+')
+                        open_file.write(recv_data['FILE_UPLOAD'][1])
+                        open_file.close()
+                        full_data['FILE_UPLOAD'] = (self.user, recv_data['FILE_UPLOAD'][0], 'SUCCESS')
+
+                    except exec as e:
+                        full_data['ERROR'] += e
+
+            data_json = json.dumps(full_data)
             byte_json = data_json.encode('ascii')
-
-            print(byte_json)
             self.send_message(byte_json)
 
             self.data = b''
 
-
     def connection_lost(self, exc):
+        full_data = {}
         if exc:
-            print('Client {} error: {}'.format(self.address, exc))
-        elif self.data:
-            print('Client {} sent {} but then closed'.format(self.address, self.data))
+            full_data['USERS_LEFT'].append(self.user)
+            full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
         else:
-            print('Client {} closed socket'.format(self.address))
+            full_data['USERS_LEFT'].append(self.user)
+        data_json = json.dumps(full_data)
+        byte_json = data_json.encode('ascii')
+        self.send_message(byte_json)
 
     def username_check(self, name):
 
         if name not in self.user_list["USER_LIST"]:
-            print("Hi new user TRUE")
-            self.user_list["USER_LIST"].append(name)
-            print(self.user_list["USER_LIST"])
-            self.validate_user["USERNAME_ACCEPTED"] = "True"
+            for k, v in self.saved_users.items():
+                if v == name:
+                    return False
+            return True
         else:
-            self.validate_user["USERNAME_ACCEPTED"] = "False"
-            print("That name is taken: FALSE")
+            return False
 
 
 def parse_command_line(description):
