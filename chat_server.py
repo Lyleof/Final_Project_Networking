@@ -5,11 +5,13 @@ import struct
 
 
 class ChatServer(asyncio.Protocol):
+    def __init__(self):
+        self.user = ''
+        self.data = ''
+        self.length = 0
 
     def connection_made(self, transport):
         self.transport = transport
-        self.user = ''
-        self.data = b''
         self.user_list = {"USER_LIST": []}
         self.saved_users = {}
         self.messages = {'MESSAGES': []}
@@ -21,9 +23,14 @@ class ChatServer(asyncio.Protocol):
         self.transport.write(data)
 
     def data_received(self, data):
-        self.data += data
-        if len(self.data[4:]) == struct.unpack('!I', self.data[0:4])[0]:
-            recv_data = json.loads(self.data[4:].decode('ascii'))
+        if self.data == '':
+            self.length = struct.unpack("!I", data[0:4])[0]
+            data = data[4: self.length + 4]
+
+        self.data += data.decode('ascii')
+
+        if len(self.data) == self.length:
+            recv_data = json.loads(self.data)
             full_data = {}
 
             if 'USERNAME' in recv_data:
@@ -89,7 +96,7 @@ class ChatServer(asyncio.Protocol):
             byte_json = data_json.encode('ascii')
             self.send_message(byte_json)
 
-            self.data = b''
+            self.data = ''
 
     def connection_lost(self, exc):
         full_data = {}

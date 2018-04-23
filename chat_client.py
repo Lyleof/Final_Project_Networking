@@ -8,24 +8,32 @@ import calendar
 
 
 class ChatClient(asyncio.Protocol):
+    def __init__(self):
+        self.length = 0
+        self.login_status = False
+        self.data = ''
+        self.username = ''
 
     def connection_made(self, transport):
         self.transport = transport
-        self.login_status = False
-        self.data = b''
-        self.username = ''
 
     def send_message(self, data):
         self.transport.write(data)
 
     def data_received(self, data):
-        self.data += data
-        if len(self.data[4:]) == struct.unpack('!I', self.data[0:4])[0]:
-            recv_data = json.loads(self.data[4:].decode('ascii'))
+        if self.data == '':
+            self.length = struct.unpack("!I", data[0:4])[0]
+            data = data[4: self.length + 4]
+
+        self.data += data.decode('ascii')
+
+        if len(self.data) == self.length:
+            recv_data = json.loads(self.data)
+            print(recv_data)
 
             if 'USERNAME_ACCEPTED' in recv_data:
-                if recv_data['USERNAME_ACCEPTED'] and self.username == '':
-                    if ['USERNAME'] in recv_data:
+                if recv_data['USERNAME_ACCEPTED']:
+                    if 'USERNAME' in recv_data:
                         self.username = recv_data['USERNAME']
 
                     print('  ')
@@ -134,9 +142,9 @@ class ChatClient(asyncio.Protocol):
                     print("-----------------------")
                     print('  ')
 
-        self.data = b''
+            self.data = ''
 
-
+# TODO: Chnage Username existsing to serverside
 @asyncio.coroutine
 def handle_user_input(loop, client):
     login_data = {'USERNAME': ''}
@@ -148,6 +156,7 @@ def handle_user_input(loop, client):
 
     while not client.login_status:
         choice = input('Create New User[Y] or Check for Existing Username[N]:  ')
+        print(client.login_status)
 
         if choice == 'N':
             ip_address['IP'] = ('', ip)
@@ -170,12 +179,16 @@ def handle_user_input(loop, client):
 
             client.send_message(byte_count)
             client.send_message(byte_json)
+
+            yield from asyncio.sleep(3)
+
             client.username = message
 
         login_data['USERNAME'] = ''
         ip_address['IP'] = ()
 
     while client.login_status:
+        print(client.username)
         message = yield from loop.run_in_executor(None, input, "> ")
         if message == "quit" or message == 'exit':
             loop.stop()
