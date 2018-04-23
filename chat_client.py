@@ -5,6 +5,7 @@ import struct
 import json
 import time
 import calendar
+import datetime
 
 
 class ChatClient(asyncio.Protocol):
@@ -13,6 +14,7 @@ class ChatClient(asyncio.Protocol):
         self.login_status = False
         self.data = ''
         self.username = ''
+        self.feed = False
 
     def connection_made(self, transport):
         self.transport = transport
@@ -29,12 +31,12 @@ class ChatClient(asyncio.Protocol):
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
-            print(recv_data)
+            # print(recv_data)
 
             if 'USERNAME_ACCEPTED' in recv_data:
                 if recv_data['USERNAME_ACCEPTED']:
-                    if 'USERNAME' in recv_data:
-                        self.username = recv_data['USERNAME']
+                    if 'USER_LIST' in recv_data:
+                        self.username = recv_data['USER_LIST'][-1] # does new name append to end?
 
                     print('  ')
                     print("Your Username is: {}".format(self.username))
@@ -81,15 +83,29 @@ class ChatClient(asyncio.Protocol):
                 print('  ')
 
             if 'MESSAGES' in recv_data:
-                print('--------Messages--------')
-                print('------------------------')
-                for i in recv_data['MESSAGES']:
-                    if i[1] == self.username:
-                        print('----- Private Message -----')
-                        print('>>>> {}:    (Sent at {})'.format(i[0], i[3], i[2]))
-                        print('----------------------------')
-                    if i[1] == 'ALL':
-                        print('{}: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+                if not self.feed:
+                    print('--------Messages--------')
+                    print('------------------------')
+                    for i in recv_data['MESSAGES']:
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                        if i[1] == self.username:
+                            print('----- Private Message -----')
+                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('----------------------------')
+                        if i[1] == 'ALL':
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
+
+                        self.feed = True
+                else:
+                    for i in recv_data['MESSAGES']:
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                        print(i[0])
+                        if i[1] == self.username:
+                            print('----- Private Message -----')
+                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('----------------------------')
+                        if i[1] == 'ALL':
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
 
             if 'FILE_LIST' in recv_data:
                 print('  ')
@@ -180,7 +196,7 @@ def handle_user_input(loop, client):
             client.send_message(byte_count)
             client.send_message(byte_json)
 
-            yield from asyncio.sleep(3)
+            yield from asyncio.sleep(1)
 
             client.username = message
 
@@ -188,8 +204,8 @@ def handle_user_input(loop, client):
         ip_address['IP'] = ()
 
     while client.login_status:
-        print(client.username)
-        message = yield from loop.run_in_executor(None, input, "> ")
+        message = yield from loop.run_in_executor(None, input, "{} >>> ".format(client.username))
+
         if message == "quit" or message == 'exit':
             loop.stop()
             return
@@ -252,6 +268,7 @@ def handle_user_input(loop, client):
             byte_count = struct.pack('!I', len(byte_json))
             client.send_message(byte_count)
             client.send_message(byte_json)
+            yield from asyncio.sleep(1)
 
         default_message['MESSAGES'] = []
         file_upload['FILE_UPLOAD'] = ()
