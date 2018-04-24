@@ -3,29 +3,26 @@ import argparse
 import json
 import struct
 
-
-
 class ChatServer(asyncio.Protocol):
     messages_list = {'MESSAGES': []}
-    user_list = {"USER_LIST": []}
-    transport_list = []
+    transport_list = {}
 
     def __init__(self):
         self.user = ''
         self.data = ''
         self.length = 0
-#        self.user_list = {"USER_LIST": []}
         self.saved_users = {}
         self.file_list = {'FILE_LIST': []}
 
+
     def connection_made(self, transport):
         self.transport = transport
-        ChatServer.transport_list.append(self.transport)
+        self.first_msg = True
 
     def send_message(self, data):
-        #for i in range(len(ChatServer.transport_list)):
-         #   ChatServer.transport_list[i].write(data)
-        self.transport.write(data)
+        for k, v in ChatServer.transport_list:
+            ChatServer.v.write(data)
+        # self.transport.write(data)
 
     def data_received(self, data):
         if self.data == '':
@@ -38,20 +35,19 @@ class ChatServer(asyncio.Protocol):
             recv_data = json.loads(self.data)
             full_data = {}
             full_data['USERS_JOINED'] = []
-            full_data['USERS_LEFT'] = []
 
             if 'USERNAME' in recv_data:
                 result = self.username_check(recv_data['USERNAME'])
                 full_data['USERNAME_ACCEPTED'] = result
                 if result:
-                    ChatServer.user_list['USER_LIST'].append(recv_data['USERNAME'])
+                    ChatServer.transport_list[recv_data['USERNAME']] = self.transport
                     self.user = recv_data['USERNAME']
 
                     full_data['USERS_JOINED'].append(self.user)
                     full_data['INFO'] = 'Welcome the CYOSP Chatroom'
-                    full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
-                    print("msg")
-                    print(ChatServer.messages_list['MESSAGES'])
+                    for k in self.transport_list:
+                        full_data['USER_LIST'].append(k)
+                    #print(ChatServer.messages_list['MESSAGES'])
                     full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
 
             if 'IP' in recv_data:
@@ -70,7 +66,8 @@ class ChatServer(asyncio.Protocol):
 
             if 'MESSAGES' in recv_data:
                 if recv_data['MESSAGES'] == '/users':
-                    full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
+                    for i in ChatServer.transport_list:
+                        full_data['USER_LIST'].append(i)
                 if recv_data['MESSAGES'] == '/file_list':
                     full_data['FILE_LIST'] = self.file_list['FILE_LIST']
                 else:
@@ -103,24 +100,38 @@ class ChatServer(asyncio.Protocol):
                     except exec as e:
                         full_data['ERROR'] += e
 
-            data_json = json.dumps(full_data)
-            byte_json = data_json.encode('ascii')
-            print(byte_json)
-            byte_count = struct.pack('!I', len(byte_json))
-            self.send_message(byte_count)
-            self.send_message(byte_json)
+            if self.first_msg:
+                data_json = json.dumps(full_data)
+                byte_json = data_json.encode('ascii')
+                byte_count = struct.pack('!I', len(byte_json))
+                self.joinning_message(byte_count, self.transport)
+                self.joinning_message(byte_json, self.transport)
+
+                joined_list = {'USER_JOINED': full_data['USERS_JOINED']}
+                user_json = json.dumps(joined_list)
+                byte_user = user_json.encode('ascii')
+                byte_count_user = struct.pack('!I', len(byte_user))
+                self.send_message(byte_count_user)
+                self.send_message(byte_user)
+                self.first_msg = False
+
+            else:
+                data_json = json.dumps(full_data)
+                byte_json = data_json.encode('ascii')
+                byte_count = struct.pack('!I', len(byte_json))
+                self.send_message(byte_count)
+                self.send_message(byte_json)
             self.data = ''
 
     def connection_lost(self, exc):
         ChatServer.transport_list.remove(self.transport)
-        full_data = {}
-        full_data['USERS_LEFT'] = []
+        full_data = {'USERS_LEFT': []}
 
         if exc:
             full_data['USERS_LEFT'].append(self.user)
             full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
+            ChatServer.user_list['USER_LIST'].remove(self.user)
         else:
-            print("else statement")
             full_data['USERS_LEFT'].append(self.user)
             ChatServer.user_list['USER_LIST'].remove(self.user)
         data_json = json.dumps(full_data)
@@ -131,13 +142,19 @@ class ChatServer(asyncio.Protocol):
 
     def username_check(self, name):
 
-        if name not in ChatServer.user_list["USER_LIST"]:
+        if name not in ChatServer.transport_list:
             for k, v in self.saved_users.items():
                 if v == name:
                     return False
             return True
         else:
             return False
+
+    def joinning_message(self, data, new_user_transport):
+        for k, v in ChatServer.transport_list:
+            if v == new_user_transport:
+                ChatServer.v.write(data)
+
 
 
 def parse_command_line(description):
@@ -148,7 +165,7 @@ def parse_command_line(description):
     """
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('host', help='IP or hostname')
-    parser.add_argument('-p', metavar='port', type=int, default=7000,
+    parser.add_argument('-p', metavar='port', type=int, default=9000,
                         help='TCP port (default 7000)')
     args = parser.parse_args()
     address = (args.host, args.p)

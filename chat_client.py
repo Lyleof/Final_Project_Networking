@@ -31,7 +31,6 @@ class ChatClient(asyncio.Protocol):
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
-            # print(recv_data)
 
             if 'USERNAME_ACCEPTED' in recv_data:
                 if recv_data['USERNAME_ACCEPTED']:
@@ -51,29 +50,24 @@ class ChatClient(asyncio.Protocol):
                 print('  ')
 
             if "USER_LIST" in recv_data:
-                print('  ')
                 print("-----Current Users-----")
                 print("-----------------------")
                 for i in recv_data["USER_LIST"]:
                     print('>>> {}  Status: Online'.format(i))
                 print("-----------------------")
-                print('  ')
 
             if 'USERS_JOINED' in recv_data:
-                print('  ')
                 print("-----------------------")
                 for i in recv_data['USERS_JOINED']:
                     print('{} has joined the chatroom'.format(i))
                 print("-----------------------")
-                print('  ')
+                # print('  ')
 
             if 'USERS_LEFT' in recv_data:
-                print('  ')
                 print("-----------------------")
                 for i in recv_data["USERS_LEFT"]:
                     print('{} has left the chatroom'.format(i))
                 print("-----------------------")
-                print('  ')
 
             if 'ERROR' in recv_data:
                 print('  ')
@@ -87,25 +81,25 @@ class ChatClient(asyncio.Protocol):
                     print('--------Messages--------')
                     print('------------------------')
                     for i in recv_data['MESSAGES']:
-                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], [2]))
+                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
 
-                        self.feed = True
+                    self.feed = True
+
                 else:
                     for i in recv_data['MESSAGES']:
-                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
-                        print(i[0])
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], time_stamp))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
 
             if 'FILE_LIST' in recv_data:
                 print('  ')
@@ -172,7 +166,6 @@ def handle_user_input(loop, client):
 
     while not client.login_status:
         choice = input('Create New User[Y] or Check for Existing Username[N]:  ')
-        print(client.login_status)
 
         if choice == 'N':
             ip_address['IP'] = ('', ip)
