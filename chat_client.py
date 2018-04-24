@@ -87,25 +87,25 @@ class ChatClient(asyncio.Protocol):
                     print('--------Messages--------')
                     print('------------------------')
                     for i in recv_data['MESSAGES']:
-                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], [2]))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
 
                         self.feed = True
                 else:
                     for i in recv_data['MESSAGES']:
-                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         print(i[0])
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], i[2]))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
 
             if 'FILE_LIST' in recv_data:
                 print('  ')
