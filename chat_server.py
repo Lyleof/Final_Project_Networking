@@ -2,7 +2,7 @@ import asyncio
 import argparse
 import json
 import struct
-import ssl
+
 
 
 class ChatServer(asyncio.Protocol):
@@ -15,6 +15,7 @@ class ChatServer(asyncio.Protocol):
         self.user = ''
         self.data = ''
         self.length = 0
+#        self.user_list = {"USER_LIST": []}
         self.saved_users = {}
         self.file_list = {'FILE_LIST': []}
 
@@ -22,7 +23,6 @@ class ChatServer(asyncio.Protocol):
         self.transport = transport
         self.new_logon = True
         ChatServer.transport_list['CON_LIST'].append(self.transport)
-        print('Connection Made')
 
     def pack_message(self, full_data):
 
@@ -107,20 +107,14 @@ class ChatServer(asyncio.Protocol):
                         full_data['IP'] = (self.user, 'Username save to Server')
 
             if 'MESSAGES' in recv_data:
-                print(recv_data['MESSAGES'])
-                for i in recv_data['MESSAGES']:
-                    print(i)
-                    if i[3] == '/users':
-                        print('Command Entered')
-                        full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
-                    if i[3] == '/file_list':
-                        print('Command Entered')
-                        full_data['FILE_LIST'] = self.file_list['FILE_LIST']
-                    else:
-                        if i not in ChatServer.messages_list['MESSAGES']:
-                            ChatServer.messages_list['MESSAGES'].append(i) # get most recent msg?
-                        print(ChatServer.messages_list['MESSAGES'])
-                        full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
+                if recv_data['MESSAGES'] == '/users':
+                    full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
+                if recv_data['MESSAGES'] == '/file_list':
+                    full_data['FILE_LIST'] = self.file_list['FILE_LIST']
+                else:
+                    ChatServer.messages_list['MESSAGES'].append(recv_data['MESSAGES'][-1]) # get most recent msg?
+                    print(ChatServer.messages_list['MESSAGES'])
+                    full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
 
             if 'FILE_DOWNLOAD' in recv_data:
                 if recv_data['FILE_DOWNLOAD'][0] in self.file_list['FILE_LIST']:
@@ -157,14 +151,18 @@ class ChatServer(asyncio.Protocol):
         full_data['USERS_LEFT'] = []
 
         if exc:
-            if self.user:
-                full_data['USERS_LEFT'].append(self.user)
-                full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
+            full_data['USERS_LEFT'].append(self.user)
+            full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
         else:
             print("else statement")
             full_data['USERS_LEFT'].append(self.user)
             ChatServer.user_list['USER_LIST'].remove(self.user)
+        data_json = json.dumps(full_data)
         self.pack_message(full_data)
+       # byte_json = data_json.encode('ascii')
+       # byte_count = struct.pack('!I', len(byte_json))
+        # self.send_message(byte_count)
+        # self.send_message(byte_json)
 
     def username_check(self, name):
 
@@ -187,32 +185,17 @@ def parse_command_line(description):
     parser.add_argument('host', help='IP or hostname')
     parser.add_argument('-p', metavar='port', type=int, default=7000,
                         help='TCP port (default 7000)')
-    parser.add_argument('-a', metavar='certfile', default=None,
-                        help='Set up a basic encrypted connection')
     args = parser.parse_args()
     address = (args.host, args.p)
-
-    return address, args.a
+    return address
 
 
 if __name__ == '__main__':
-    arguments = parse_command_line('asyncio server using callbacks')
-
-    if arguments[1]:
-        purpose = ssl.Purpose.CLIENT_AUTH
-        context = ssl.create_default_context(purpose, cafile=None)
-        context.load_cert_chain(arguments[1])
-        loop = asyncio.get_event_loop()
-        coro = loop.create_server(ChatServer, *arguments[0], ssl=context)
-        server = loop.run_until_complete(coro)
-        print('Listening Encrypted at {}'.format(arguments[0]))
-
-    else:
-        loop = asyncio.get_event_loop()
-        coro = loop.create_server(ChatServer, *arguments[0])
-        server = loop.run_until_complete(coro)
-        print('Listening at {}'.format(arguments[0]))
-
+    address = parse_command_line('asyncio server using callbacks')
+    loop = asyncio.get_event_loop()
+    coro = loop.create_server(ChatServer, *address)
+    server = loop.run_until_complete(coro)
+    print('Listening at {}'.format(address))
     try:
         loop.run_forever()
     finally:

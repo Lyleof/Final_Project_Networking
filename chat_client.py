@@ -6,7 +6,6 @@ import json
 import time
 import calendar
 import datetime
-import ssl
 
 
 class ChatClient(asyncio.Protocol):
@@ -29,8 +28,6 @@ class ChatClient(asyncio.Protocol):
             data = data[4: self.length + 4]
 
         self.data += data.decode('ascii')
-
-        print('data recv')
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
@@ -176,6 +173,7 @@ def handle_user_input(loop, client):
 
     while not client.login_status:
         choice = input('Create New User[Y] or Check for Existing Username[N]:  ')
+        print(client.login_status)
 
         if choice == 'N':
             ip_address['IP'] = ('', ip)
@@ -263,16 +261,6 @@ def handle_user_input(loop, client):
                 client.send_message(byte_count)
                 client.send_message(byte_json)
 
-            else:
-                complete_message = (client.username, 'ALL', calendar.timegm(time.gmtime()), message)
-                default_message['MESSAGES'].append(complete_message)
-                data_json = json.dumps(default_message)
-                byte_json = data_json.encode('ascii')
-                byte_count = struct.pack('!I', len(byte_json))
-                client.send_message(byte_count)
-                client.send_message(byte_json)
-                yield from asyncio.sleep(1)
-
         else:
             complete_message = (client.username, 'ALL', calendar.timegm(time.gmtime()), message)
             default_message['MESSAGES'].append(complete_message)
@@ -289,22 +277,12 @@ def handle_user_input(loop, client):
         ip_address["IP"] = ()
 
 
-def run_client(host, port, cafile):
+def run_client(host, port):
     loop = asyncio.get_event_loop()
     client = ChatClient()
-
-    if cafile:
-        print('Encrpyted')
-        purpose = ssl.Purpose.SERVER_AUTH
-        context = ssl.create_default_context(purpose, cafile=cafile)
-        coro = loop.create_connection(lambda: client, host, port, ssl=context)
-        loop.run_until_complete(coro)
-        asyncio.async(handle_user_input(loop, client))
-
-    else:
-        coro = loop.create_connection(lambda: client, host, port)
-        loop.run_until_complete(coro)
-        asyncio.async(handle_user_input(loop, client))
+    coro = loop.create_connection(lambda: client, host, port)
+    loop.run_until_complete(coro)
+    asyncio.async(handle_user_input(loop, client))
 
     try:
         loop.run_forever()
@@ -336,15 +314,13 @@ def parse_command_line(description):
     """
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('host', help='IP or hostname')
-    parser.add_argument('-p', metavar='port', type=int, default=7000,
+    parser.add_argument('-p', metavar='port', type=int, default=9000,
                         help='TCP port (default 7000)')
-    parser.add_argument('-a', metavar='cafile', default=None,
-                        help='Set up a basic encrypted Connection')
     args = parser.parse_args()
-    address = (args.host, args.p, args.a)
+    address = (args.host, args.p)
     return address
 
 
 if __name__ == "__main__":
     address = parse_command_line('Chat Client')
-    run_client(address[0], address[1], address[2])
+    run_client(address[0], address[1])
