@@ -60,20 +60,22 @@ class ChatClient(asyncio.Protocol):
                 print('  ')
 
             if 'USERS_JOINED' in recv_data:
-                print('  ')
-                print("-----------------------")
-                for i in recv_data['USERS_JOINED']:
-                    print('{} has joined the chatroom'.format(i))
-                print("-----------------------")
-                print('  ')
+                if recv_data['USERS_JOINED'] != [] and self.username not in recv_data['USERS_JOINED']:
+                    print('  ')
+                    print("-----------------------")
+                    for i in recv_data['USERS_JOINED']:
+                        print('{} has joined the chatroom'.format(i))
+                    print("-----------------------")
+                    print('  ')
 
             if 'USERS_LEFT' in recv_data:
-                print('  ')
-                print("-----------------------")
-                for i in recv_data["USERS_LEFT"]:
-                    print('{} has left the chatroom'.format(i))
-                print("-----------------------")
-                print('  ')
+                if recv_data['USERS_LEFT'] != []:
+                    print('  ')
+                    print("-----------------------")
+                    for i in recv_data["USERS_LEFT"]:
+                        print('{} has left the chatroom'.format(i))
+                    print("-----------------------")
+                    print('  ')
 
             if 'ERROR' in recv_data:
                 print('  ')
@@ -95,11 +97,10 @@ class ChatClient(asyncio.Protocol):
                         if i[1] == 'ALL':
                             print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
 
-                        self.feed = True
+                    self.feed = True
                 else:
                     for i in recv_data['MESSAGES']:
                        # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
-                        print(i[0])
                         if i[1] == self.username:
                             print('----- Private Message -----')
                             print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], i[2]))
