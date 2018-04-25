@@ -30,7 +30,7 @@ class ChatClient(asyncio.Protocol):
 
         self.data += data.decode('ascii')
 
-        print('data recv')
+        # print('data recv')
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
@@ -295,6 +295,7 @@ def run_client(host, port, cafile):
 
     if cafile:
         print('Encrpyted')
+        print(cafile)
         purpose = ssl.Purpose.SERVER_AUTH
         context = ssl.create_default_context(purpose, cafile=cafile)
         coro = loop.create_connection(lambda: client, host, port, ssl=context)

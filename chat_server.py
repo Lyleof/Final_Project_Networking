@@ -8,7 +8,7 @@ import ssl
 class ChatServer(asyncio.Protocol):
     messages_list = {'MESSAGES': []}
     user_list = {"USER_LIST": []}
-    transport_list = {"CON_LIST": [], "USER": []}
+    transport_list = {"CON_LIST": []}
     new_logon = False
 
     def __init__(self):
@@ -21,12 +21,14 @@ class ChatServer(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.new_logon = True
+        self.logout = False
         ChatServer.transport_list['CON_LIST'].append(self.transport)
         print('Connection Made')
 
     def pack_message(self, full_data):
 
         data_json = json.dumps(full_data)
+        print(full_data)
 
         if self.new_logon:
             joined_data = {}
@@ -51,8 +53,31 @@ class ChatServer(asyncio.Protocol):
 
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
+        elif self.logout:
+            left_data = {}
+            left_data["USERS_LEFT"] = []
+            left_data["USERS_LEFT"] = full_data["USERS_LEFT"]
+
+            left_json = json.dumps(left_data)
+
+            for i in range(len(ChatServer.transport_list['CON_LIST'])):
+                if ChatServer.transport_list['CON_LIST'][i] != self.transport:
+                    byte_json = left_json.encode('ascii')
+                    print(byte_json)
+                    byte_count = struct.pack('!I', len(byte_json))
+                    self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
+                    self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
+
+            self.logout = False
         else:
-            byte_json = data_json.encode('ascii')
+            msg_data = {'MESSAGES': []}
+            msg_data["MESSAGES"].append(full_data["MESSAGES"][-1])
+
+            # msg_data["MESSAGES"] = msg_data["MESSAGES"][-1]
+            # print(msg_data["MESSAGES"])
+            msg_json = json.dumps(msg_data)
+
+            byte_json = msg_json.encode('ascii')
             print(byte_json)
             byte_count = struct.pack('!I', len(byte_json))
 
@@ -83,7 +108,6 @@ class ChatServer(asyncio.Protocol):
                 if result:
                     ChatServer.user_list['USER_LIST'].append(recv_data['USERNAME'])
                     self.user = recv_data['USERNAME']
-                    ChatServer.transport_list['USER'].append(self.user)
                     print(ChatServer.transport_list)
                     full_data['USERS_JOINED'].append(self.user)
                     full_data['INFO'] = 'Welcome the CYOSP Chatroom'
@@ -152,16 +176,19 @@ class ChatServer(asyncio.Protocol):
 
     def connection_lost(self, exc):
         ChatServer.transport_list['CON_LIST'].remove(self.transport)
-        ChatServer.transport_list['USER'].remove(self.user)
+
         full_data = {}
+        full_data['MESSAGES'] = []
         full_data['USERS_LEFT'] = []
+
+        self.logout = True
 
         if exc:
             if self.user:
+                ChatServer.user_list['USER_LIST'].remove(self.user)
                 full_data['USERS_LEFT'].append(self.user)
                 full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
         else:
-            print("else statement")
             full_data['USERS_LEFT'].append(self.user)
             ChatServer.user_list['USER_LIST'].remove(self.user)
         self.pack_message(full_data)
