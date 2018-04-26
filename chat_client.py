@@ -194,7 +194,6 @@ def handle_user_input(loop, client):
     yield from asyncio.sleep(1)
 
     while not client.login_status:
-
         message = yield from loop.run_in_executor(None, input, "> Enter your username: ")
         if message == "quit" or message == 'exit':
             loop.stop()
@@ -223,7 +222,7 @@ def handle_user_input(loop, client):
             if message.split(' ', maxsplit=1)[0][1:] == 'help':
                 list_commands()
 
-            if message.split(' ', maxsplit=1)[0][1:] == 'w':
+            elif message.split(' ', maxsplit=1)[0][1:] == 'w':
                 username = message.split(' ', maxsplit=2)[1]
                 private_message = message.split(' ', maxsplit=2)[2]
                 complete_message = (client.username, username, calendar.timegm(time.gmtime()),
@@ -236,7 +235,7 @@ def handle_user_input(loop, client):
                 client.send_message(byte_count)
                 client.send_message(byte_json)
 
-            if message.split(' ', maxsplit=1)[0][1:] == 'file':
+            elif message.split(' ', maxsplit=1)[0][1:] == 'file':
                 filename = message.split(' ', maxsplit=1)[1]
                 try:
                     open_file = open(filename, 'r')
@@ -252,7 +251,7 @@ def handle_user_input(loop, client):
                     print('File Upload Error: {}'.format(e))
                     print('-----------------------')
 
-            if message.split(' ', maxsplit=1)[0][1:] == 'file_download':
+            elif message.split(' ', maxsplit=1)[0][1:] == 'file_download':
                 filename = message.split(' ', maxsplit=1)[1]
                 file_download['FILE_DOWNLOAD'] = filename
                 data_json = json.dumps(file_download)
@@ -261,7 +260,7 @@ def handle_user_input(loop, client):
                 client.send_message(byte_count)
                 client.send_message(byte_json)
 
-            if message.split(' ', maxsplit=1)[0][1:] == 'save':
+            elif message.split(' ', maxsplit=1)[0][1:] == 'save':
                 ip_address['IP'] = ('SAVE', ip)
                 data_json = json.dumps(ip_address)
                 byte_json = data_json.encode('ascii')
@@ -277,7 +276,7 @@ def handle_user_input(loop, client):
                 byte_count = struct.pack('!I', len(byte_json))
                 client.send_message(byte_count)
                 client.send_message(byte_json)
-                yield from asyncio.sleep(1)
+            yield from asyncio.sleep(1)
 
         else:
             complete_message = (client.username, 'ALL', calendar.timegm(time.gmtime()), message)
