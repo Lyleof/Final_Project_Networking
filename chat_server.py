@@ -19,7 +19,7 @@ import argparse
 import json
 import struct
 import ssl
-
+import socket
 
 class ChatServer(asyncio.Protocol):
     """
@@ -225,6 +225,9 @@ class ChatServer(asyncio.Protocol):
                         print('Command Entered')
                         full_data['FILE_LIST'] = self.file_list['FILE_LIST']
                         self.command = True
+                    if i[3] == '/feed':
+                        full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
+                        self.command = True
                     if not self.command:
                         if i not in ChatServer.messages_list['MESSAGES']:
                             ChatServer.messages_list['MESSAGES'].append(i) # get most recent msg?
@@ -317,8 +320,10 @@ def parse_command_line(description):
     :param description: description of the program
     :return: A tuple of args
     """
+    ip = socket.gethostbyname(socket.gethostname())
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('host', help='IP or hostname')
+    parser.add_argument('host', help='IP or hostname', nargs='?',
+                        default=ip)
     parser.add_argument('-p', metavar='port', type=int, default=7000,
                         help='TCP port (default 7000)')
     parser.add_argument('-a', metavar='certfile', default=None,
