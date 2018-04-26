@@ -26,24 +26,24 @@ class ChatClient(asyncio.Protocol):
         self.transport.write(data)
 
     def data_received(self, data):
-        print('Data: ', data)
-        print('Overflow: ', self.overflow)
         if self.overflow:
             self.length = struct.unpack('!I', self.overflow[0:4])[0]
             new_data = self.overflow[4: self.length + 4]
             data = new_data + data
             self.overflow = b''
 
-        if self.data == '':
+        if self.data == '' and self.length == 0:
             self.length = struct.unpack("!I", data[0:4])[0]
             data = data[4: self.length + 4]
+        if data == data[0:4]:
+            self.data = ''
+        else:
+            self.data += data.decode('ascii')
 
-        self.data += data.decode('ascii')
-
-        print(data)
         if len(self.data) > self.length:
             self.overflow += self.data[:self.length].encode('ascii')
             self.data = ''
+
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
 
@@ -174,6 +174,7 @@ class ChatClient(asyncio.Protocol):
                     print('  ')
 
             self.data = ''
+            self.length = 0
 
 
 @asyncio.coroutine

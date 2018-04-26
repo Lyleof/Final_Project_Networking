@@ -15,6 +15,7 @@ class ChatServer(asyncio.Protocol):
         self.user = ''
         self.data = ''
         self.length = 0
+        self.overflow = b''
         self.saved_users = {}
         self.file_list = {'FILE_LIST': []}
 
@@ -103,11 +104,23 @@ class ChatServer(asyncio.Protocol):
         client_transport.write(data)
 
     def data_received(self, data):
-        if self.data == '':
+        if self.overflow:
+            self.length = struct.unpack('!I', self.overflow[0:4])[0]
+            new_data = self.overflow[4: self.length + 4]
+            data = new_data + data
+            self.overflow = b''
+
+        if self.data == '' and self.length == 0:
             self.length = struct.unpack("!I", data[0:4])[0]
             data = data[4: self.length + 4]
+        if data == data[0:4]:
+            self.data = ''
+        else:
+            self.data += data.decode('ascii')
 
-        self.data += data.decode('ascii')
+        if len(self.data) > self.length:
+            self.overflow += self.data[:self.length].encode('ascii')
+            self.data = ''
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
@@ -197,6 +210,7 @@ class ChatServer(asyncio.Protocol):
                 self.pack_message(full_data)
 
             self.data = ''
+            self.length = 0
 
     def connection_lost(self, exc):
         ChatServer.transport_list['CON_LIST'].remove(self.transport)
@@ -211,7 +225,7 @@ class ChatServer(asyncio.Protocol):
             if self.user:
                 ChatServer.user_list['USER_LIST'].remove(self.user)
                 full_data['USERS_LEFT'].append(self.user)
-                full_data['ERROR'] += '{} has left unexpectedly. Error: {}'.format(self.user, exc)
+                full_data['ERROR'] = '{} has left unexpectedly. Error: {}'.format(self.user, exc)
         else:
             full_data['USERS_LEFT'].append(self.user)
             ChatServer.user_list['USER_LIST'].remove(self.user)
