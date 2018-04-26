@@ -14,22 +14,36 @@ class ChatClient(asyncio.Protocol):
         self.length = 0
         self.login_status = False
         self.data = ''
+        self.overflow = b''
         self.username = ''
         self.feed = False
 
     def connection_made(self, transport):
+        print('Connection Made')
         self.transport = transport
 
     def send_message(self, data):
         self.transport.write(data)
 
     def data_received(self, data):
+        print('Data: ', data)
+        print('Overflow: ', self.overflow)
+        if self.overflow:
+            self.length = struct.unpack('!I', self.overflow[0:4])[0]
+            new_data = self.overflow[4: self.length + 4]
+            data = new_data + data
+            self.overflow = b''
+
         if self.data == '':
             self.length = struct.unpack("!I", data[0:4])[0]
             data = data[4: self.length + 4]
 
         self.data += data.decode('ascii')
 
+        print(data)
+        if len(self.data) > self.length:
+            self.overflow += self.data[:self.length].encode('ascii')
+            self.data = ''
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
 
@@ -88,8 +102,8 @@ class ChatClient(asyncio.Protocol):
                 if not self.feed:
                     print('--------Messages--------')
                     print('------------------------')
-                    for i in recv_data['MESSAGES']:
-                        if recv_data['MESSAGES']:
+                    if recv_data['MESSAGES']:
+                        for i in recv_data['MESSAGES']:
                             time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                             if i[1] == self.username:
                                 print('----- Private Message -----')

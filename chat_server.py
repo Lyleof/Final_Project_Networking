@@ -32,6 +32,7 @@ class ChatServer(asyncio.Protocol):
         print(full_data)
 
         if self.new_logon:
+            print('New Logon')
             joined_data = {}
             joined_data["USERS_JOINED"] = []
             joined_data["USERS_JOINED"] = full_data["USERS_JOINED"]
@@ -48,12 +49,13 @@ class ChatServer(asyncio.Protocol):
                     self.new_logon = False
                 else:
                     byte_json = joined_json.encode('ascii')
+                    print('Else new Logon statment')
                     print(joined_json)
                     byte_count = struct.pack('!I', len(byte_json))
 
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
-        if self.logout:
+        elif self.logout:
             left_data = {}
             left_data["USERS_LEFT"] = []
             left_data["USERS_LEFT"] = full_data["USERS_LEFT"]
@@ -69,7 +71,7 @@ class ChatServer(asyncio.Protocol):
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
 
             self.logout = False
-        if self.command:
+        elif self.command:
             for i in range(len(ChatServer.transport_list['CON_LIST'])):
                 if ChatServer.transport_list['CON_LIST'][i] == self.transport:
                     byte_json = data_json.encode('ascii')
@@ -80,11 +82,10 @@ class ChatServer(asyncio.Protocol):
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
             self.command = False
         else:
+            print('Basic Messages')
             msg_data = {'MESSAGES': []}
-            if len(full_data['MESSAGES']) > 1:
+            if full_data['MESSAGES']:
                 msg_data["MESSAGES"].append(full_data["MESSAGES"][-1])
-            else:
-                msg_data["MESSAGES"].append(full_data["MESSAGES"])
 
             # msg_data["MESSAGES"] = msg_data["MESSAGES"][-1]
             # print(msg_data["MESSAGES"])
@@ -113,6 +114,7 @@ class ChatServer(asyncio.Protocol):
             full_data = {}
 
             if 'USERNAME' in recv_data:
+                print('Username recivied')
                 result = self.username_check(recv_data['USERNAME'])
                 full_data['USERNAME_ACCEPTED'] = result
                 if result:
@@ -127,7 +129,6 @@ class ChatServer(asyncio.Protocol):
             if 'IP' in recv_data:
                 if recv_data['IP'][1] == 'CHECK':
                     result = self.ip_check(recv_data['IP'][0])
-                    print(result)
                     if result:
                         full_data['USERNAME_ACCEPTED'] = True
                         ChatServer.user_list['USER_LIST'].append(self.saved_users[recv_data['IP'][0]])
