@@ -30,8 +30,6 @@ class ChatClient(asyncio.Protocol):
 
         self.data += data.decode('ascii')
 
-        # print('data recv')
-
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
             # print(recv_data)
@@ -92,24 +90,24 @@ class ChatClient(asyncio.Protocol):
                     print('--------Messages--------')
                     print('------------------------')
                     for i in recv_data['MESSAGES']:
-                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], [2]))
+                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
 
                     self.feed = True
                 else:
                     for i in recv_data['MESSAGES']:
-                       # time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
                         if i[1] == self.username:
                             print('----- Private Message -----')
-                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('>>>> [{}]: {}    (Sent at {})'.format(i[0], i[3], time_stamp))
                             print('----------------------------')
                         if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], i[2]))
+                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
 
             if 'FILE_LIST' in recv_data:
                 print('  ')
@@ -140,6 +138,7 @@ class ChatClient(asyncio.Protocol):
                     print("-----------------------")
                     print('  ')
 
+            # TODO: Fix indexs to reflect response properly
             if 'FILE_UPLOAD' in recv_data:
                 if recv_data['FILE_UPLOAD'][2] == 'ERROR' and recv_data['FILE_UPLOAD'][0] == self.username:
                     print('  ')
@@ -298,7 +297,7 @@ def run_client(host, port, cafile):
         print(cafile)
         purpose = ssl.Purpose.SERVER_AUTH
         context = ssl.create_default_context(purpose, cafile=cafile)
-        coro = loop.create_connection(lambda: client, host, port, ssl=context)
+        coro = loop.create_connection(lambda: client, host, port, ssl=context, server_hostname='localhost')
         loop.run_until_complete(coro)
         asyncio.async(handle_user_input(loop, client))
 

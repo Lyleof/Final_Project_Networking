@@ -25,6 +25,7 @@ class ChatServer(asyncio.Protocol):
         ChatServer.transport_list['CON_LIST'].append(self.transport)
         print('Connection Made')
 
+    # TODO: ADD self.command Functionality
     def pack_message(self, full_data):
 
         data_json = json.dumps(full_data)
@@ -157,6 +158,7 @@ class ChatServer(asyncio.Protocol):
                 else:
                     full_data['FILE_DOWNLOAD'] = (self.user, 'File not on Server', 'ERROR')
 
+            # TODO: Change Sent respone format
             if 'FILE_UPLOAD' in recv_data:
                 if recv_data['FILE_UPLOAD'][0] in self.file_list['FILE_LIST']:
                     full_data['FILE_UPLOAD'] = (self.user, recv_data['FILE_UPLOAD'][0],
