@@ -1,3 +1,18 @@
+"""chat_client.py
+
+Author:            Walter Hill, FInn Jensen
+Class:             Network Programming
+Assignment:        Final Project
+Date Assigned:     4/17/18
+Due date:          4/26/18
+
+Description: An asynchronous client and server object to maintain a terminal chat application
+
+Champlain College CSI-235, Spring 2018
+This code builds off skeleton code written by
+Prof. Joshua Auerbach (jauerbach@champlain.edu)
+"""
+
 import asyncio
 import argparse
 import socket
@@ -10,6 +25,19 @@ import ssl
 
 
 class ChatClient(asyncio.Protocol):
+    """
+      A class to asynchronously communicate with a chat server
+      :param: asnycio.Protocol: Async object to allow for asynchronous networking
+
+      :Variables:
+                length(int): Holds the length of a given message from the server
+                login_status(bool): Toggled when the user is initially logging int
+                data(str): Stores the data coming over the network from the server
+                overflow (byte str): Extraneous data from the server stored here
+                username (str): stores this client's username
+                feed (bool): toggles whether tho display the entire message feed
+    """
+
     def __init__(self):
         self.length = 0
         self.login_status = False
@@ -19,13 +47,30 @@ class ChatClient(asyncio.Protocol):
         self.feed = False
 
     def connection_made(self, transport):
+        """
+          A function to accept a two-way connection with a server
+          :param: Transport: Networking object that allows sending to the server
+          :return: None
+        """
         print('Connection Made')
         self.transport = transport
 
     def send_message(self, data):
+        """
+          A function to send json packaged and encoded data to the server
+          :param: Data: encoded data to send across the socket to the server
+          :return: None
+        """
         self.transport.write(data)
 
     def data_received(self, data):
+        """
+          A function to receive responses from the server.
+          These responses can range from messages to user notifications
+          :param: Data: encoded data sent across the socket from the server
+          :return: None
+        """
+
         if self.overflow:
             self.length = struct.unpack('!I', self.overflow[0:4])[0]
             new_data = self.overflow[4: self.length + 4]
@@ -179,6 +224,13 @@ class ChatClient(asyncio.Protocol):
 
 @asyncio.coroutine
 def handle_user_input(loop, client):
+    """
+        A function to handle user's chat commands and send them to the chat server.
+        Handles messages and special commands.
+    :param: Loop: The async running loop object
+            Client: The async client object
+    :return: None
+    """
     login_data = {'USERNAME': ''}
     default_message = {'MESSAGES': []}
     file_upload = {'FILE_UPLOAD': ()}
@@ -296,6 +348,13 @@ def handle_user_input(loop, client):
 
 
 def run_client(host, port, cafile):
+    """
+        A function to initialize and loop the async client
+    :param: Host: hostnam or ip address
+            Port: specific socket port
+            cafile: SSL Certificate filename
+    :return: None
+    """
     loop = asyncio.get_event_loop()
     client = ChatClient()
 
@@ -320,6 +379,11 @@ def run_client(host, port, cafile):
 
 
 def list_commands():
+    """
+        A function to display the chat command options given to the user
+    :param: None
+    :return: Displays text to terminal
+    """
     print('  ')
     print('Chat Client Commands')
     print('-----------------------')

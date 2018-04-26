@@ -1,3 +1,19 @@
+"""chat_server.py
+
+Author:            Walter Hill, FInn Jensen
+Class:             Network Programming
+Assignment:        Final Project
+Date Assigned:     4/17/18
+Due date:          4/26/18
+
+Description: An asynchronous client and server object to maintain a terminal chat application
+
+-Worked with Finn Jensen
+Champlain College CSI-235, Spring 2018
+This code builds off skeleton code written by
+Prof. Joshua Auerbach (jauerbach@champlain.edu)
+"""
+
 import asyncio
 import argparse
 import json
@@ -6,6 +22,21 @@ import ssl
 
 
 class ChatServer(asyncio.Protocol):
+    """
+      A class to receive clients, their messages, and to communicate back to them asynchronously.
+
+      :Variables:
+                message_list(dict): List of message keys with message data within as a list
+                user_list(dict): list of users within the user_list key
+                transport_list(dict): list of client transports within the con_list key
+                new_logon(bool): Toggled when a new user connects for the first time
+                length(int): Holds the length of a given message from the server
+                data(str): Stores the data coming over the network from the server
+                overflow (byte str): Extraneous data from the server stored here
+                user(str): stores this client's username
+                saved_users(dict) = List of ip keys and their remembered username
+                file_list(bool): toggles whether tho display the entire message feed
+    """
     messages_list = {'MESSAGES': []}
     user_list = {"USER_LIST": []}
     transport_list = {"CON_LIST": []}
@@ -20,6 +51,12 @@ class ChatServer(asyncio.Protocol):
         self.file_list = {'FILE_LIST': []}
 
     def connection_made(self, transport):
+        """
+          A function to accept a two-way connection with a client
+          :param: Transport: Networking object that allows sending to the client
+          :return: None
+        """
+
         self.transport = transport
         self.new_logon = True
         self.command = False
@@ -28,7 +65,12 @@ class ChatServer(asyncio.Protocol):
         print('Connection Made')
 
     def pack_message(self, full_data):
-
+        """
+          A function to receive raw response data and
+          send that data to the correct clients in the correct format.
+          :param: full_data: raw data to be packaged sent across the socket to the correct clients
+          :return: None
+        """
         data_json = json.dumps(full_data)
         print(full_data)
 
@@ -101,9 +143,20 @@ class ChatServer(asyncio.Protocol):
                 self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
 
     def send_message(self, client_transport, data):
+        """
+          A function to send json packaged and encoded data to the client
+          :param: Data: encoded data to send across the socket to the client
+          :return: None
+        """
         client_transport.write(data)
 
     def data_received(self, data):
+        """
+          A function to receive messages from clients.
+          These messages can range from messages to special user commands
+          :param: Data: encoded data sent across the socket to the client
+          :return: None
+        """
         if self.overflow:
             self.length = struct.unpack('!I', self.overflow[0:4])[0]
             new_data = self.overflow[4: self.length + 4]
@@ -213,6 +266,11 @@ class ChatServer(asyncio.Protocol):
             self.length = 0
 
     def connection_lost(self, exc):
+        """
+          A function to handle disconnects from clients.
+          :param: exc: Exception parameter
+          :return: None
+        """
         ChatServer.transport_list['CON_LIST'].remove(self.transport)
 
         full_data = {}
@@ -232,7 +290,11 @@ class ChatServer(asyncio.Protocol):
         self.pack_message(full_data)
 
     def username_check(self, name):
-
+        """
+          A function to validate a username. Handles new users and old ones by ip
+]          :param: Name(str): username
+          :return: a True or False boolean
+        """
         if name not in ChatServer.user_list["USER_LIST"]:
             for k, v in self.saved_users.items():
                 if v == name:
