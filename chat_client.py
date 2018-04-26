@@ -270,6 +270,8 @@ def handle_user_input(loop, client):
                     client.send_message(byte_json)
 
                 else:
+                    if message.split(' ', maxsplit=1)[0][1:] == 'feed':
+                        client.feed = False
                     complete_message = (client.username, 'ALL', calendar.timegm(time.gmtime()), message)
                     default_message['MESSAGES'].append(complete_message)
                     data_json = json.dumps(default_message)
@@ -331,6 +333,7 @@ def list_commands():
     print('Save Username: Save your current username to the server to auto login at this ip address: /save')
     print('Exit: Close the client: quit or exit')
     print('Commands: Lists all commands for the Client: /help')
+    print('Feed: Redisplay all messages: /feed')
     print('-----------------------')
     print('  ')
 
@@ -341,8 +344,9 @@ def parse_command_line(description):
     :param description: description of the program
     :return: A tuple of args
     """
+    ip = socket.gethostbyname(socket.gethostname())
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('host', help='IP or hostname')
+    parser.add_argument('host', metavar='host', nargs='?', help='IP or hostname', default=ip)
     parser.add_argument('-p', metavar='port', type=int, default=7000,
                         help='TCP port (default 7000)')
     parser.add_argument('-a', metavar='cafile', default=None,
