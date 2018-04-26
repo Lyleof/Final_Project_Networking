@@ -32,7 +32,6 @@ class ChatClient(asyncio.Protocol):
 
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
-            # print(recv_data)
 
             if 'USERNAME_ACCEPTED' in recv_data:
                 if recv_data['USERNAME_ACCEPTED']:
@@ -90,15 +89,16 @@ class ChatClient(asyncio.Protocol):
                     print('--------Messages--------')
                     print('------------------------')
                     for i in recv_data['MESSAGES']:
-                        time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
-                        if i[1] == self.username:
-                            print('----- Private Message -----')
-                            print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
-                            print('----------------------------')
-                        if i[1] == 'ALL':
-                            print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
-
+                        if recv_data['MESSAGES']:
+                            time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
+                            if i[1] == self.username:
+                                print('----- Private Message -----')
+                                print('>>>> [{}]:    (Sent at {})'.format(i[0], i[3], time_stamp))
+                                print('----------------------------')
+                            if i[1] == 'ALL':
+                                print('[{}]: {}   (Sent at {})'.format(i[0], i[3], time_stamp))
                     self.feed = True
+
                 else:
                     for i in recv_data['MESSAGES']:
                         time_stamp = datetime.datetime.fromtimestamp(i[2]).strftime('%X')
@@ -119,51 +119,49 @@ class ChatClient(asyncio.Protocol):
                 print('  ')
 
             if 'FILE_DOWNLOAD' in recv_data:
-                if recv_data['FILE_DOWNLOAD'][2] == 'ERROR' and self.username == recv_data['FILE_DOWNLOAD'][0]:
+                if recv_data['FILE_DOWNLOAD'][1] == 'ERROR':
                     print('  ')
                     print("-----------------------")
-                    print(recv_data['FILE_DOWNLOAD'][1])
+                    print(recv_data['FILE_DOWNLOAD'][0])
                     print("-----------------------")
                     print('  ')
-                if self.username == recv_data['FILE_DOWNLOAD'][0]:
+                else:
                     print('  ')
                     print("-----------------------")
                     try:
-                        open_file = open(recv_data['FILE_DOWNLOAD'][2], 'w+')
-                        open_file.write(recv_data['FILE_DOWNLOAD'][1])
+                        open_file = open(recv_data['FILE_DOWNLOAD'][1], 'w+')
+                        open_file.write(recv_data['FILE_DOWNLOAD'][0])
                         open_file.close()
-                        print('>>> {} Downloaded Successfully'.format(recv_data['FILE_DOWNLOAD'][2]))
+                        print('>>> {} Downloaded Successfully'.format(recv_data['FILE_DOWNLOAD'][1]))
                     except exec as e:
-                        print('>>> Error: {} while Downloading File {}'.format(e, recv_data['FILE_DOWNLOAD'][2]))
+                        print('>>> Error: {} while Downloading File {}'.format(e, recv_data['FILE_DOWNLOAD'][1]))
                     print("-----------------------")
                     print('  ')
 
-            # TODO: Fix indexs to reflect response properly
             if 'FILE_UPLOAD' in recv_data:
-                if recv_data['FILE_UPLOAD'][2] == 'ERROR' and recv_data['FILE_UPLOAD'][0] == self.username:
+                if recv_data['FILE_UPLOAD'][1] == 'ERROR':
                     print('  ')
                     print("-----------------------")
-                    print('File {} already exists on the Server'.format(recv_data['FILE_UPLOAD'][1]))
+                    print('File {} already exists on the Server'.format(recv_data['FILE_UPLOAD'][0]))
                     print("-----------------------")
                     print('  ')
-                if recv_data['FILE_UPLOAD'][0] == self.username:
+                else:
                     print('  ')
                     print("-----------------------")
-                    print('>>> {} Uploaded Successfully'.format(recv_data['FILE_UPLOAD'][1]))
+                    print('>>> {} Uploaded Successfully'.format(recv_data['FILE_UPLOAD'][0]))
                     print("-----------------------")
                     print('  ')
 
             if 'IP' in recv_data:
-                if recv_data['IP'][0] == self.username:
                     print('  ')
                     print("-----------------------")
-                    print('>>> {}'.format(recv_data['IP'][1]))
+                    print('>>> {}'.format(recv_data['IP']))
                     print("-----------------------")
                     print('  ')
 
             self.data = ''
 
-# TODO: Chnage Username existsing to serverside
+
 @asyncio.coroutine
 def handle_user_input(loop, client):
     login_data = {'USERNAME': ''}
@@ -173,37 +171,32 @@ def handle_user_input(loop, client):
     ip_address = {'IP': ()}
     ip = socket.gethostbyname(socket.gethostname())
 
+    ip_address['IP'] = (ip, 'CHECK')
+    data_json = json.dumps(ip_address)
+    byte_json = data_json.encode('ascii')
+    byte_count = struct.pack("!I", len(byte_json))
+    client.send_message(byte_count)
+    client.send_message(byte_json)
+    yield from asyncio.sleep(1)
+
     while not client.login_status:
-        choice = input('Create New User[Y] or Check for Existing Username[N]:  ')
 
-        if choice == 'N':
-            ip_address['IP'] = ('', ip)
-            data_json = json.dumps(ip_address)
-            byte_json = data_json.encode('ascii')
-            byte_count = struct.pack("!I", len(byte_json))
-            client.send_message(byte_count)
-            client.send_message(byte_json)
+        message = yield from loop.run_in_executor(None, input, "> Enter your username: ")
+        if message == "quit" or message == 'exit':
+            loop.stop()
+            return
 
-        if choice == 'Y':
-            message = yield from loop.run_in_executor(None, input, "> Enter your username: ")
-            if message == "quit" or message == 'exit':
-                loop.stop()
-                return
+        login_data["USERNAME"] = message
+        data_json = json.dumps(login_data)
+        byte_json = data_json.encode('ascii')
+        byte_count = struct.pack("!I", len(byte_json))
 
-            login_data["USERNAME"] = message
-            data_json = json.dumps(login_data)
-            byte_json = data_json.encode('ascii')
-            byte_count = struct.pack("!I", len(byte_json))
+        client.send_message(byte_count)
+        client.send_message(byte_json)
 
-            client.send_message(byte_count)
-            client.send_message(byte_json)
-
-            yield from asyncio.sleep(1)
-
-            client.username = message
+        yield from asyncio.sleep(1)
 
         login_data['USERNAME'] = ''
-        ip_address['IP'] = ()
 
     while client.login_status:
         message = yield from loop.run_in_executor(None, input, "{} >>> ".format(client.username))
@@ -255,7 +248,7 @@ def handle_user_input(loop, client):
                 client.send_message(byte_json)
 
             if message.split(' ', maxsplit=1)[0][1:] == 'save':
-                ip_address['IP'] = (message, ip)
+                ip_address['IP'] = ('SAVE', ip)
                 data_json = json.dumps(ip_address)
                 byte_json = data_json.encode('ascii')
                 byte_count = struct.pack('!I', len(byte_json))

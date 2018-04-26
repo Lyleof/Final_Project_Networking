@@ -21,11 +21,11 @@ class ChatServer(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.new_logon = True
+        self.command = False
         self.logout = False
         ChatServer.transport_list['CON_LIST'].append(self.transport)
         print('Connection Made')
 
-    # TODO: ADD self.command Functionality
     def pack_message(self, full_data):
 
         data_json = json.dumps(full_data)
@@ -41,7 +41,6 @@ class ChatServer(asyncio.Protocol):
             for i in range(len(ChatServer.transport_list['CON_LIST'])):
                 if ChatServer.transport_list['CON_LIST'][i] == self.transport:
                     byte_json = data_json.encode('ascii')
-                    print(byte_json)
                     byte_count = struct.pack('!I', len(byte_json))
 
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
@@ -54,7 +53,7 @@ class ChatServer(asyncio.Protocol):
 
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
-        elif self.logout:
+        if self.logout:
             left_data = {}
             left_data["USERS_LEFT"] = []
             left_data["USERS_LEFT"] = full_data["USERS_LEFT"]
@@ -70,9 +69,22 @@ class ChatServer(asyncio.Protocol):
                     self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
 
             self.logout = False
+        if self.command:
+            for i in range(len(ChatServer.transport_list['CON_LIST'])):
+                if ChatServer.transport_list['CON_LIST'][i] == self.transport:
+                    byte_json = data_json.encode('ascii')
+                    print(byte_json)
+                    byte_count = struct.pack('!I', len(byte_json))
+
+                    self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_count)
+                    self.send_message(ChatServer.transport_list['CON_LIST'][i], byte_json)
+            self.command = False
         else:
             msg_data = {'MESSAGES': []}
-            msg_data["MESSAGES"].append(full_data["MESSAGES"][-1])
+            if len(full_data['MESSAGES']) > 1:
+                msg_data["MESSAGES"].append(full_data["MESSAGES"][-1])
+            else:
+                msg_data["MESSAGES"].append(full_data["MESSAGES"])
 
             # msg_data["MESSAGES"] = msg_data["MESSAGES"][-1]
             # print(msg_data["MESSAGES"])
@@ -99,37 +111,40 @@ class ChatServer(asyncio.Protocol):
         if len(self.data) == self.length:
             recv_data = json.loads(self.data)
             full_data = {}
-#            full_data['USERS_LEFT'] = []
 
             if 'USERNAME' in recv_data:
-                full_data['USERS_JOINED'] = []
-                print("GOT USERNAME")
                 result = self.username_check(recv_data['USERNAME'])
                 full_data['USERNAME_ACCEPTED'] = result
                 if result:
+                    full_data['USERS_JOINED'] = []
                     ChatServer.user_list['USER_LIST'].append(recv_data['USERNAME'])
                     self.user = recv_data['USERNAME']
-                    print(ChatServer.transport_list)
                     full_data['USERS_JOINED'].append(self.user)
                     full_data['INFO'] = 'Welcome the CYOSP Chatroom'
                     full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
-                    print("msg")
-                    print(ChatServer.messages_list['MESSAGES'])
                     full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
 
             if 'IP' in recv_data:
-                if not recv_data['IP'][0]:
-                    for k, v in self.saved_users.items():
-                        if k == recv_data['IP'][1]:
-                            full_data['USERNAME_ACCEPTED'] = True
-                            full_data['USERNAME'] = v
-                else:
-                    for k, v in self.saved_users.items():
-                        if k == recv_data['IP'][1]:
-                            full_data['IP'] = (self.user, 'A Username is already save to this ip address')
-                    if not full_data['IP']:
-                        self.saved_users[recv_data['IP'][1]] = self.user
-                        full_data['IP'] = (self.user, 'Username save to Server')
+                if recv_data['IP'][1] == 'CHECK':
+                    result = self.ip_check(recv_data['IP'][0])
+                    print(result)
+                    if result:
+                        full_data['USERNAME_ACCEPTED'] = True
+                        ChatServer.user_list['USER_LIST'].append(self.saved_users[recv_data['IP'][0]])
+                        self.user = self.saved_users[recv_data['IP'][0]]
+                        full_data['USERS_JOINED'].append(self.user)
+                        full_data['INFO'] = 'Welcome the CYOSP Chatroom'
+                        full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
+                        full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
+                if recv_data['IP'][1] == 'SAVE':
+                    self.command = True
+                    result = self.ip_check(recv_data['IP'][0])
+                    if result:
+                        full_data['IP'] = 'A Username is Already Saved to this ip Address'
+
+                    else:
+                        full_data['IP'] = 'Username Successfully Saved to ip Address'
+                        self.saved_users[recv_data['IP'][0]] = self.user
 
             if 'MESSAGES' in recv_data:
                 print(recv_data['MESSAGES'])
@@ -138,42 +153,48 @@ class ChatServer(asyncio.Protocol):
                     if i[3] == '/users':
                         print('Command Entered')
                         full_data['USER_LIST'] = ChatServer.user_list['USER_LIST']
+                        self.command = True
                     if i[3] == '/file_list':
                         print('Command Entered')
                         full_data['FILE_LIST'] = self.file_list['FILE_LIST']
-                    else:
+                        self.command = True
+                    if not self.command:
                         if i not in ChatServer.messages_list['MESSAGES']:
                             ChatServer.messages_list['MESSAGES'].append(i) # get most recent msg?
                         print(ChatServer.messages_list['MESSAGES'])
                         full_data['MESSAGES'] = ChatServer.messages_list['MESSAGES']
 
             if 'FILE_DOWNLOAD' in recv_data:
-                if recv_data['FILE_DOWNLOAD'][0] in self.file_list['FILE_LIST']:
+                self.command = True
+                if recv_data['FILE_DOWNLOAD'] in self.file_list['FILE_LIST']:
                     try:
-                        open_file = open(recv_data['FILE_DOWNLOAD'][0], 'r')
+                        open_file = open(recv_data['FILE_DOWNLOAD'], 'r')
                         data = open_file.read()
-                        full_data['FILE_DOWNLOAD'] = (self.user, data, recv_data['FILE_DOWNLOAD'][0])
+                        full_data['FILE_DOWNLOAD'] = (data, recv_data['FILE_DOWNLOAD'])
+
                     except exec as e:
                         full_data['ERROR'] += e
                 else:
-                    full_data['FILE_DOWNLOAD'] = (self.user, 'File not on Server', 'ERROR')
+                    full_data['FILE_DOWNLOAD'] = ('File not on Server', 'ERROR')
 
-            # TODO: Change Sent respone format
             if 'FILE_UPLOAD' in recv_data:
+                self.command = True
                 if recv_data['FILE_UPLOAD'][0] in self.file_list['FILE_LIST']:
-                    full_data['FILE_UPLOAD'] = (self.user, recv_data['FILE_UPLOAD'][0],
+                    full_data['FILE_UPLOAD'] = (recv_data['FILE_UPLOAD'][0],
                                                 'ERROR')
                 else:
                     try:
                         open_file = open(recv_data['FILE_UPLOAD'][0], 'w+')
                         open_file.write(recv_data['FILE_UPLOAD'][1])
                         open_file.close()
-                        full_data['FILE_UPLOAD'] = (self.user, recv_data['FILE_UPLOAD'][0], 'SUCCESS')
+                        full_data['FILE_UPLOAD'] = (recv_data['FILE_UPLOAD'][0], 'SUCCESS')
 
                     except exec as e:
                         full_data['ERROR'] += e
 
-            self.pack_message(full_data)
+            if full_data:
+                self.pack_message(full_data)
+
             self.data = ''
 
     def connection_lost(self, exc):
@@ -204,6 +225,13 @@ class ChatServer(asyncio.Protocol):
             return True
         else:
             return False
+
+    def ip_check(self, ip):
+        for k, v in self.saved_users.items():
+            if k == ip:
+                return True
+
+        return False
 
 
 def parse_command_line(description):
