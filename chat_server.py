@@ -295,7 +295,7 @@ class ChatServer(asyncio.Protocol):
     def username_check(self, name):
         """
           A function to validate a username. Handles new users and old ones by ip
-]          :param: Name(str): username
+          :param: Name(str): username
           :return: a True or False boolean
         """
         if name not in ChatServer.user_list["USER_LIST"]:
